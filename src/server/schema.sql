@@ -13,3 +13,24 @@ CREATE TABLE IF NOT EXISTS snippets (
     code TEXT NOT NULL,
     position INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS exercises (
+	id INTEGER PRIMARY KEY,
+	entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+	-- Empty for questions written from notes.
+	snippet_id INTEGER REFERENCES snippets(id) ON DELETE CASCADE,
+	prompt TEXT NOT NULL,
+	answer TEXT NOT NULL,
+	language TEXT,
+	due_date TEXT NOT NULL,
+	interval_days INTEGER NOT NULL DEFAULT 0,
+	streak INTEGER NOT NULL DEFAULT 0,
+	retired INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO settings (key, value) VALUES ('review_time', '18:30');

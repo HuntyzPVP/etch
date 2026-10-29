@@ -11,7 +11,15 @@ const entryInput = z.object({
 	date: z.iso.date(),
 	topic: z.string().trim().min(1),
 	notes: z.string().default(""),
-	snippets: z.array(z.object({ language: z.enum(LANGUAGES), code: z.string().min(1) })).default([]),
+	snippets: z
+		.array(
+			z.object({
+				id: z.number().int().positive().optional(),
+				language: z.enum(LANGUAGES),
+				code: z.string().min(1),
+			}),
+		)
+		.default([]),
 });
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -22,14 +30,25 @@ const updateEntry = db.prepare("UPDATE entries SET date = ?, topic = ?, notes = 
 const deleteEntry = db.prepare("DELETE FROM entries WHERE id = ?");
 const listSnippets = db.prepare("SELECT * FROM snippets WHERE entry_id = ? ORDER BY position");
 const insertSnippet = db.prepare("INSERT INTO snippets (entry_id, language, code, position) VALUES (?, ?, ?, ?)");
-const deleteSnippets = db.prepare("DELETE FROM snippets WHERE entry_id = ?");
+const updateSnippet = db.prepare(
+	"UPDATE snippets SET language = ?, code = ?, position = ? WHERE id = ? AND entry_id = ?",
+);
+const deleteSnippet = db.prepare("DELETE FROM snippets WHERE id = ?");
 
 function withSnippets(entry: Entry) {
 	return { ...entry, snippets: listSnippets.all(entry.id) as Snippet[] };
 }
 
+// Existing snippets are updated in place so their ids, and the exercises linked to them, survive edits.
 function saveSnippets(entryId: number, snippets: z.infer<typeof entryInput>["snippets"]) {
-	snippets.forEach((s, position) => insertSnippet.run(entryId, s.language, s.code, position));
+	const kept = new Set(snippets.map((s) => s.id));
+	for (const existing of listSnippets.all(entryId) as Snippet[]) {
+		if (!kept.has(existing.id)) deleteSnippet.run(existing.id);
+	}
+	snippets.forEach((s, position) => {
+		if (s.id) updateSnippet.run(s.language, s.code, position, s.id, entryId);
+		else insertSnippet.run(entryId, s.language, s.code, position);
+	});
 }
 
 export const entries = new Hono()
@@ -50,10 +69,8 @@ export const entries = new Hono()
 	.put("/:id", zValidator("param", idParam), zValidator("json", entryInput), (c) => {
 		const { id } = c.req.valid("param");
 		const { date, topic, notes, snippets } = c.req.valid("json");
-		// Snippets are replaced wholesale; the form always sends the full list.
 		const found = transaction(() => {
 			if (updateEntry.run(date, topic, notes, id).changes === 0) return false;
-			deleteSnippets.run(id);
 			saveSnippets(id, snippets);
 			return true;
 		});

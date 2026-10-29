@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { today } from "../shared/dates";
 import { LANGUAGES, type Language } from "../shared/languages";
 import type { Entry, EntryInput } from "./api";
 import { CodeBlock } from "./CodeBlock";
@@ -10,18 +11,15 @@ type Props = {
 	onCancel?: () => void;
 };
 
-// key only exists so React can track each block while you add and remove them.
-type Draft = { key: string; language: Language; code: string };
-
-// en-CA formats as YYYY-MM-DD in the local timezone, which is what the date input expects.
-const today = () => new Date().toLocaleDateString("en-CA");
+// key lets React track each block while you add and remove them; id is set only for saved snippets.
+type Draft = { key: string; id?: number; language: Language; code: string };
 
 export function EntryForm({ entry, onSave, onCancel }: Props) {
 	const [date, setDate] = useState(entry?.date ?? today());
 	const [topic, setTopic] = useState(entry?.topic ?? "");
 	const [notes, setNotes] = useState(entry?.notes ?? "");
 	const [drafts, setDrafts] = useState<Draft[]>(
-		() => entry?.snippets.map((s) => ({ key: String(s.id), language: s.language, code: s.code })) ?? [],
+		() => entry?.snippets.map((s) => ({ key: String(s.id), id: s.id, language: s.language, code: s.code })) ?? [],
 	);
 	const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +40,7 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 			setError("A snippet is empty. Add code to it or remove it.");
 			return;
 		}
-		const snippets: EntryInput["snippets"] = drafts.map((d) => ({ language: d.language, code: d.code }));
+		const snippets: EntryInput["snippets"] = drafts.map((d) => ({ id: d.id, language: d.language, code: d.code }));
 		const saved = await onSave({ date, topic, notes, snippets });
 		setError(saved ? null : "Couldn't save. Check the date and topic.");
 		if (saved && !entry) {
