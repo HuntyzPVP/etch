@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import "./db";
 
 const port = Number(process.env.PORT ?? 8787);
 const app = new Hono().basePath("/api");
