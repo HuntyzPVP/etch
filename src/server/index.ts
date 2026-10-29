@@ -1,8 +1,8 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import "./db";
+import { entries } from "./entries";
 
 const port = Number(process.env.PORT ?? 8787);
-const app = new Hono().basePath("/api");
+const app = new Hono().basePath("/api").route("/entries", entries);
 
 serve({ fetch: app.fetch, port }, (info) => console.log(`API listening on http://localhost:${info.port}`));
