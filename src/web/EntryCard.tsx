@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Entry, EntryInput } from "./api";
+import { CodeBlock } from "./CodeBlock";
+import { LANGUAGE_INFO } from "./codeLanguages";
 import { EntryForm } from "./EntryForm";
 
 type Props = {
@@ -44,9 +46,10 @@ export function EntryCard({ entry, onUpdate, onDelete }: Props) {
 			</header>
 			{entry.notes && <p className="notes">{entry.notes}</p>}
 			{entry.snippets.map((snippet) => (
-				<pre key={snippet.id} className="snippet">
-					<code>{snippet.code}</code>
-				</pre>
+				<div key={snippet.id} className="snippet">
+					<span className="language">{LANGUAGE_INFO[snippet.language].label}</span>
+					<CodeBlock language={snippet.language} value={snippet.code} />
+				</div>
 			))}
 			<div className="actions">
 				<button onClick={() => setEditing(true)}>Edit</button>

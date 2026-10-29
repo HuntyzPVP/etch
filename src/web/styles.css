@@ -7,7 +7,6 @@
 	--accent: #2f6f5e;
 	--accent-text: #ffffff;
 	--error: #b3261e;
-	--code-bg: #f1efea;
 	color-scheme: light dark;
 }
 
@@ -21,7 +20,6 @@
 		--accent: #5fb39c;
 		--accent-text: #0f1f1a;
 		--error: #f2b8b5;
-		--code-bg: #2a2927;
 	}
 }
 
@@ -61,6 +59,7 @@ h3 {
 }
 
 input,
+select,
 textarea,
 button {
 	font: inherit;
@@ -71,6 +70,13 @@ input,
 textarea {
 	width: 100%;
 	padding: 8px 10px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+select {
+	padding: 6px 8px;
 	background: var(--surface);
 	border: 1px solid var(--border);
 	border-radius: 6px;
@@ -131,13 +137,31 @@ button.primary {
 	white-space: pre-wrap;
 }
 
-.snippet {
-	margin: 0;
-	padding: 12px;
-	overflow-x: auto;
-	background: var(--code-bg);
+.snippet,
+.snippet-draft {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.snippet-draft .row {
+	justify-content: space-between;
+}
+
+.language {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.code-block {
+	overflow: hidden;
+	border: 1px solid var(--border);
 	border-radius: 6px;
 	font-size: 0.9rem;
+}
+
+.actions .add {
+	margin-right: auto;
 }
 
 .error {

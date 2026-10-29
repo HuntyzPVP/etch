@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { LANGUAGES, type Language } from "../shared/languages";
 import type { Entry, EntryInput } from "./api";
+import { CodeBlock } from "./CodeBlock";
+import { LANGUAGE_INFO } from "./codeLanguages";
 
 type Props = {
 	entry?: Entry;
 	onSave: (input: EntryInput) => Promise<boolean>;
 	onCancel?: () => void;
 };
+
+// key only exists so React can track each block while you add and remove them.
+type Draft = { key: string; language: Language; code: string };
 
 // en-CA formats as YYYY-MM-DD in the local timezone, which is what the date input expects.
 const today = () => new Date().toLocaleDateString("en-CA");
@@ -14,16 +20,35 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 	const [date, setDate] = useState(entry?.date ?? today());
 	const [topic, setTopic] = useState(entry?.topic ?? "");
 	const [notes, setNotes] = useState(entry?.notes ?? "");
-	const [failed, setFailed] = useState(false);
+	const [drafts, setDrafts] = useState<Draft[]>(
+		() => entry?.snippets.map((s) => ({ key: String(s.id), language: s.language, code: s.code })) ?? [],
+	);
+	const [error, setError] = useState<string | null>(null);
+
+	function addDraft() {
+		setDrafts((prev) => [...prev, { key: crypto.randomUUID(), language: "python", code: "" }]);
+	}
+
+	function updateDraft(key: string, change: Partial<Draft>) {
+		setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...change } : d)));
+	}
+
+	function removeDraft(key: string) {
+		setDrafts((prev) => prev.filter((d) => d.key !== key));
+	}
 
 	async function submit() {
-		// Existing snippets pass through untouched until the snippet editor exists.
-		const snippets = entry?.snippets.map(({ language, code }) => ({ language, code })) ?? [];
+		if (drafts.some((d) => d.code.trim() === "")) {
+			setError("A snippet is empty. Add code to it or remove it.");
+			return;
+		}
+		const snippets: EntryInput["snippets"] = drafts.map((d) => ({ language: d.language, code: d.code }));
 		const saved = await onSave({ date, topic, notes, snippets });
-		setFailed(!saved);
+		setError(saved ? null : "Couldn't save. Check the date and topic.");
 		if (saved && !entry) {
 			setTopic("");
 			setNotes("");
+			setDrafts([]);
 		}
 	}
 
@@ -51,8 +76,35 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 				value={notes}
 				onChange={(e) => setNotes(e.target.value)}
 			/>
-			{failed && <p className="error">Couldn't save. Check the date and topic.</p>}
+			{drafts.map((draft) => (
+				<div key={draft.key} className="snippet-draft">
+					<div className="row">
+						<select
+							value={draft.language}
+							onChange={(e) => updateDraft(draft.key, { language: e.target.value as Language })}
+						>
+							{LANGUAGES.map((language) => (
+								<option key={language} value={language}>
+									{LANGUAGE_INFO[language].label}
+								</option>
+							))}
+						</select>
+						<button type="button" onClick={() => removeDraft(draft.key)}>
+							Remove
+						</button>
+					</div>
+					<CodeBlock
+						language={draft.language}
+						value={draft.code}
+						onChange={(code) => updateDraft(draft.key, { code })}
+					/>
+				</div>
+			))}
+			{error && <p className="error">{error}</p>}
 			<div className="actions">
+				<button type="button" className="add" onClick={addDraft}>
+					Add snippet
+				</button>
 				{onCancel && (
 					<button type="button" onClick={onCancel}>
 						Cancel
