@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, type Entry, type EntryInput } from "./api";
+import { api, useDataChanged, type Entry, type EntryInput } from "./api";
+import { useConfirm } from "./ConfirmDialog";
 import { EntryCard } from "./EntryCard";
 import { EntryForm } from "./EntryForm";
+import { ReportButton } from "./ReportDialog";
 
 async function fetchEntries() {
 	const res = await api.entries.$get();
@@ -10,6 +12,7 @@ async function fetchEntries() {
 
 export function LogPage() {
 	const [entries, setEntries] = useState<Entry[]>([]);
+	const confirm = useConfirm();
 
 	useEffect(() => {
 		void fetchEntries().then(setEntries);
@@ -18,6 +21,8 @@ export function LogPage() {
 	async function reload() {
 		setEntries(await fetchEntries());
 	}
+
+	useDataChanged(() => void reload());
 
 	async function create(input: EntryInput) {
 		const res = await api.entries.$post({ json: input });
@@ -32,17 +37,19 @@ export function LogPage() {
 	}
 
 	async function remove(entry: Entry) {
-		if (!confirm(`Delete "${entry.topic}"?`)) return;
+		const message = "Its snippets and review exercises are deleted too.";
+		if (!(await confirm({ title: `Delete "${entry.topic}"?`, message, action: "Delete" }))) return;
 		const res = await api.entries[":id"].$delete({ param: { id: String(entry.id) } });
 		if (res.ok) await reload();
 	}
 
 	return (
-		<>
-			<section>
-				<h2>Log what I learned</h2>
-				<EntryForm onSave={create} />
-			</section>
+		<div className="narrow">
+			<div className="page-heading">
+				<h1>Log what I learned</h1>
+				<ReportButton />
+			</div>
+			<EntryForm onSave={create} />
 			<section>
 				<h2>Learning log</h2>
 				{entries.length === 0 && <p className="empty">Nothing logged yet.</p>}
@@ -55,6 +62,6 @@ export function LogPage() {
 					/>
 				))}
 			</section>
-		</>
+		</div>
 	);
 }

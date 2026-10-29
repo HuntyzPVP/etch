@@ -29,15 +29,17 @@ export function EntryCard({ entry, onUpdate, onDelete }: Props) {
 	}
 
 	return (
-		<article className="entry">
+		<article className="tile entry">
 			<header>
-				<time dateTime={entry.date}>{formatDate(entry.date)}</time>
+				<time className="pill" dateTime={entry.date}>
+					{formatDate(entry.date)}
+				</time>
 				<h3>{entry.topic}</h3>
 			</header>
 			{entry.notes && <p className="notes">{entry.notes}</p>}
 			{entry.snippets.map((snippet) => (
 				<div key={snippet.id} className="snippet">
-					<span className="language">{LANGUAGE_INFO[snippet.language].label}</span>
+					<span className="label">{LANGUAGE_INFO[snippet.language].label}</span>
 					<CodeBlock language={snippet.language} value={snippet.code} />
 				</div>
 			))}

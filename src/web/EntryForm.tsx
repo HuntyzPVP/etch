@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { today } from "../shared/dates";
 import { LANGUAGES, type Language } from "../shared/languages";
 import type { Entry, EntryInput } from "./api";
 import { CodeBlock } from "./CodeBlock";
+import { DatePicker } from "./Pickers";
 import { LANGUAGE_INFO } from "./codeLanguages";
 
 type Props = {
@@ -22,6 +23,7 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 		() => entry?.snippets.map((s) => ({ key: String(s.id), id: s.id, language: s.language, code: s.code })) ?? [],
 	);
 	const [error, setError] = useState<string | null>(null);
+	const saving = useRef(false);
 
 	function addDraft() {
 		setDrafts((prev) => [...prev, { key: crypto.randomUUID(), language: "python", code: "" }]);
@@ -36,12 +38,16 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 	}
 
 	async function submit() {
+		if (saving.current) return;
 		if (drafts.some((d) => d.code.trim() === "")) {
 			setError("A snippet is empty. Add code to it or remove it.");
 			return;
 		}
 		const snippets: EntryInput["snippets"] = drafts.map((d) => ({ id: d.id, language: d.language, code: d.code }));
-		const saved = await onSave({ date, topic, notes, snippets });
+		// Guards against a second Enter or click creating the entry twice while the first save is in flight.
+		saving.current = true;
+		const saved = await onSave({ date, topic, notes, snippets }).catch(() => false);
+		saving.current = false;
 		setError(saved ? null : "Couldn't save. Check the date and topic.");
 		if (saved && !entry) {
 			setTopic("");
@@ -52,14 +58,14 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 
 	return (
 		<form
-			className="entry-form"
+			className="tile entry-form"
 			onSubmit={(e) => {
 				e.preventDefault();
 				void submit();
 			}}
 		>
 			<div className="row">
-				<input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+				<DatePicker value={date} onChange={setDate} label="Date" />
 				<input
 					className="topic"
 					placeholder="Topic"

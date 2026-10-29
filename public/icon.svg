@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+	<rect width="512" height="512" rx="116" fill="#D97757"/>
+	<!-- A light edge under each groove makes the E read as cut into the surface. -->
+	<path d="M346 158H180v196h166M180 256h128" fill="none" stroke="#F2B39C" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 9)"/>
+	<path d="M346 158H180v196h166M180 256h128" fill="none" stroke="#141413" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

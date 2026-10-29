@@ -1,7 +1,7 @@
 export type ReviewState = { interval_days: number; streak: number };
 export type ReviewOutcome = ReviewState & { retired: boolean };
 
-const RETIRE_AFTER = 5;
+export const RETIRE_AFTER = 5;
 const MISSED_INTERVAL = 1;
 
 // Due date becomes today + interval_days, so 0 keeps the exercise in today's list.
