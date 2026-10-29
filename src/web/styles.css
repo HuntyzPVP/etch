@@ -172,3 +172,56 @@ button.primary {
 .empty {
 	color: var(--muted);
 }
+
+.app-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.app-header h1 {
+	margin: 0;
+}
+
+nav {
+	display: flex;
+	gap: 16px;
+}
+
+nav a {
+	color: var(--muted);
+	text-decoration: none;
+}
+
+nav a.active {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.review {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+
+.topic-label {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.prompt {
+	margin: 0;
+	font-size: 1.05rem;
+	white-space: pre-wrap;
+}
+
+.answer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
