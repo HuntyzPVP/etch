@@ -34,3 +34,14 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 INSERT OR IGNORE INTO settings (key, value) VALUES ('review_time', '18:30');
+
+CREATE TABLE IF NOT EXISTS planner_items (
+	id INTEGER PRIMARY KEY,
+	title TEXT NOT NULL,
+	due_date TEXT,
+	-- Only set when due_date is.
+	due_time TEXT,
+	done INTEGER NOT NULL DEFAULT 0,
+	done_at TEXT,
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

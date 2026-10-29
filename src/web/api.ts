@@ -5,4 +5,6 @@ export const api = hc<AppType>(window.location.origin).api;
 
 export type Entry = InferResponseType<typeof api.entries.$get>[number];
 export type EntryInput = InferRequestType<typeof api.entries.$post>["json"];
+export type PlannerItem = InferResponseType<typeof api.planner.$get>[number];
+export type PlannerInput = InferRequestType<typeof api.planner.$post>["json"];
 export type DueExercise = InferResponseType<typeof api.reviews.due.$get>[number];

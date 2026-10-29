@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatDate } from "../shared/dates";
 import type { Entry, EntryInput } from "./api";
 import { CodeBlock } from "./CodeBlock";
 import { LANGUAGE_INFO } from "./codeLanguages";
@@ -9,17 +10,6 @@ type Props = {
 	onUpdate: (input: EntryInput) => Promise<boolean>;
 	onDelete: () => void;
 };
-
-// Built from parts because new Date("2026-10-28") is read as UTC midnight and shows the previous day in US timezones.
-function formatDate(iso: string) {
-	const [year, month, day] = iso.split("-").map(Number);
-	return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	});
-}
 
 export function EntryCard({ entry, onUpdate, onDelete }: Props) {
 	const [editing, setEditing] = useState(false);

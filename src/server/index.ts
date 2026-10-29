@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { entries } from "./entries";
+import { planner } from "./planner";
 import { reviews } from "./reviews";
 import { settings } from "./settings";
 
@@ -9,7 +10,8 @@ const app = new Hono()
 	.basePath("/api")
 	.route("/entries", entries)
 	.route("/reviews", reviews)
-	.route("/settings", settings);
+	.route("/settings", settings)
+	.route("/planner", planner);
 
 export type AppType = typeof app;
 

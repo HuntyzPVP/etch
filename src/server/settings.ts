@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { TIME_PATTERN } from "../shared/dates";
 import { db } from "./db";
 
 const settingsInput = z.object({
-	// 24-hour HH:MM in the PC's local time.
-	review_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+	review_time: z.string().regex(TIME_PATTERN),
 });
 type Settings = z.infer<typeof settingsInput>;
 
