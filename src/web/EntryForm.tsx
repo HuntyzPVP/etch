@@ -1,60 +1,85 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { today } from "../shared/dates";
-import { LANGUAGES, type Language } from "../shared/languages";
-import type { Entry, EntryInput } from "./api";
-import { CodeBlock } from "./CodeBlock";
+import { api, type Entry, type EntryInput } from "./api";
 import { DatePicker } from "./Pickers";
-import { LANGUAGE_INFO } from "./codeLanguages";
+import { MarkdownEditor } from "./MarkdownEditor";
+
+const DRAFT_DELAY_MS = 1000;
 
 type Props = {
 	entry?: Entry;
-	onSave: (input: EntryInput) => Promise<boolean>;
+	// Resolves to an error message, or null once saved.
+	onSave: (input: EntryInput) => Promise<string | null>;
 	onCancel?: () => void;
+	titles?: readonly string[];
+	// Title for a new note opened from a [[link]] to it.
+	initialTopic?: string;
 };
 
-// key lets React track each block while you add and remove them; id is set only for saved snippets.
-type Draft = { key: string; id?: number; language: Language; code: string };
-
-export function EntryForm({ entry, onSave, onCancel }: Props) {
-	const [date, setDate] = useState(entry?.date ?? today());
-	const [topic, setTopic] = useState(entry?.topic ?? "");
-	const [notes, setNotes] = useState(entry?.notes ?? "");
-	const [drafts, setDrafts] = useState<Draft[]>(
-		() => entry?.snippets.map((s) => ({ key: String(s.id), id: s.id, language: s.language, code: s.code })) ?? [],
-	);
+export function EntryForm({ entry, onSave, onCancel, titles, initialTopic = "" }: Props) {
+	const draftKey = entry ? String(entry.id) : "new";
+	const saved = { date: entry?.date ?? today(), topic: entry?.topic ?? initialTopic, notes: entry?.notes ?? "" };
+	const [date, setDate] = useState(saved.date);
+	const [topic, setTopic] = useState(saved.topic);
+	const [notes, setNotes] = useState(saved.notes);
+	const [loaded, setLoaded] = useState(false);
+	const [restored, setRestored] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const saving = useRef(false);
 
-	function addDraft() {
-		setDrafts((prev) => [...prev, { key: crypto.randomUUID(), language: "python", code: "" }]);
-	}
+	useEffect(() => {
+		void api.drafts[":key"]
+			.$get({ param: { key: draftKey } })
+			.then((res) => (res.ok ? res.json() : null))
+			.then((draft) => {
+				// A link to a new note wins over an old draft with a different title.
+				if (draft && !(initialTopic && draft.topic !== initialTopic)) {
+					setDate(draft.date);
+					setTopic(draft.topic);
+					setNotes(draft.notes);
+					setRestored(true);
+				}
+			})
+			.finally(() => setLoaded(true));
+	}, [draftKey, initialTopic]);
 
-	function updateDraft(key: string, change: Partial<Draft>) {
-		setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...change } : d)));
-	}
+	const changed = date !== saved.date || topic !== saved.topic || notes !== saved.notes;
 
-	function removeDraft(key: string) {
-		setDrafts((prev) => prev.filter((d) => d.key !== key));
+	// Keeps a copy of unsaved typing on the server, so closing the window doesn't lose it.
+	useEffect(() => {
+		if (!loaded) return;
+		const param = { key: draftKey };
+		const timer = setTimeout(() => {
+			if (changed) void api.drafts[":key"].$put({ param, json: { date, topic, notes } });
+			else void api.drafts[":key"].$delete({ param });
+		}, DRAFT_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [loaded, changed, draftKey, date, topic, notes]);
+
+	function discard() {
+		setDate(saved.date);
+		setTopic(saved.topic);
+		setNotes(saved.notes);
+		setRestored(false);
 	}
 
 	async function submit() {
 		if (saving.current) return;
-		if (drafts.some((d) => d.code.trim() === "")) {
-			setError("A snippet is empty. Add code to it or remove it.");
-			return;
-		}
-		const snippets: EntryInput["snippets"] = drafts.map((d) => ({ id: d.id, language: d.language, code: d.code }));
 		// Guards against a second Enter or click creating the entry twice while the first save is in flight.
 		saving.current = true;
-		const saved = await onSave({ date, topic, notes, snippets }).catch(() => false);
+		const problem = await onSave({ date, topic, notes }).catch(() => "Couldn't reach Etch's server.");
 		saving.current = false;
-		setError(saved ? null : "Couldn't save. Check the date and topic.");
-		if (saved && !entry) {
+		setError(problem);
+		if (problem) return;
+		setRestored(false);
+		if (!entry) {
+			setDate(today());
 			setTopic("");
 			setNotes("");
-			setDrafts([]);
 		}
 	}
+
+	if (!loaded) return null;
 
 	return (
 		<form
@@ -74,43 +99,31 @@ export function EntryForm({ entry, onSave, onCancel }: Props) {
 					required
 				/>
 			</div>
-			<textarea
-				placeholder="What did you learn? Put it in your own words."
-				rows={5}
+			<MarkdownEditor
 				value={notes}
-				onChange={(e) => setNotes(e.target.value)}
+				onChange={setNotes}
+				placeholder="What did you learn? Put it in your own words. Ctrl+K links another note."
+				minHeight="160px"
+				titles={titles}
 			/>
-			{drafts.map((draft) => (
-				<div key={draft.key} className="snippet-draft">
-					<div className="row">
-						<select
-							value={draft.language}
-							onChange={(e) => updateDraft(draft.key, { language: e.target.value as Language })}
-						>
-							{LANGUAGES.map((language) => (
-								<option key={language} value={language}>
-									{LANGUAGE_INFO[language].label}
-								</option>
-							))}
-						</select>
-						<button type="button" onClick={() => removeDraft(draft.key)}>
-							Remove
-						</button>
-					</div>
-					<CodeBlock
-						language={draft.language}
-						value={draft.code}
-						onChange={(code) => updateDraft(draft.key, { code })}
-					/>
-				</div>
-			))}
 			{error && <p className="error">{error}</p>}
 			<div className="actions">
-				<button type="button" className="add" onClick={addDraft}>
-					Add snippet
-				</button>
+				{restored && (
+					<p className="hint restored">
+						Restored what you hadn't saved.
+						<button type="button" onClick={discard}>
+							Discard
+						</button>
+					</p>
+				)}
 				{onCancel && (
-					<button type="button" onClick={onCancel}>
+					<button
+						type="button"
+						onClick={() => {
+							void api.drafts[":key"].$delete({ param: { key: draftKey } });
+							onCancel();
+						}}
+					>
 						Cancel
 					</button>
 				)}

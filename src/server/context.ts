@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addDays, today } from "../shared/dates";
 import { db } from "./db";
+import { splitNotes } from "./fences";
 
 const LOOKBACK_DAYS = 30;
 const NOTES_LIMIT = 1200;
@@ -44,7 +45,7 @@ export function recentLog(since: string, limit: number, { withCode }: { withCode
 		return {
 			date: entry.date,
 			topic: entry.topic,
-			notes: clip(entry.notes, NOTES_LIMIT),
+			notes: clip(splitNotes(entry.notes).prose, NOTES_LIMIT),
 			snippets: withCode
 				? snippets.map((s) => ({ language: s.language, code: clip(s.code, CODE_LIMIT) }))
 				: snippets.map((s) => s.language),

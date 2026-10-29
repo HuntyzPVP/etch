@@ -8,10 +8,14 @@ import { sql } from "@codemirror/lang-sql";
 import { StreamLanguage } from "@codemirror/language";
 import { csharp } from "@codemirror/legacy-modes/mode/clike";
 import { lua } from "@codemirror/legacy-modes/mode/lua";
+import { powerShell } from "@codemirror/legacy-modes/mode/powershell";
+import { shell } from "@codemirror/legacy-modes/mode/shell";
 import type { Extension } from "@codemirror/state";
 import type { Language } from "../shared/languages";
 
 export const LANGUAGE_INFO: Record<Language, { label: string; extension: () => Extension }> = {
+	bash: { label: "Bash", extension: () => StreamLanguage.define(shell) },
+	powershell: { label: "PowerShell", extension: () => StreamLanguage.define(powerShell) },
 	python: { label: "Python", extension: () => python() },
 	javascript: { label: "JavaScript", extension: () => javascript() },
 	typescript: { label: "TypeScript", extension: () => javascript({ typescript: true }) },
@@ -24,4 +28,5 @@ export const LANGUAGE_INFO: Record<Language, { label: string; extension: () => E
 	sql: { label: "SQL", extension: () => sql() },
 	html: { label: "HTML", extension: () => html() },
 	css: { label: "CSS", extension: () => css() },
+	output: { label: "Output", extension: () => [] },
 };

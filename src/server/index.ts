@@ -3,7 +3,9 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { startBackups } from "./backup";
 import { chat } from "./chat";
+import { drafts } from "./drafts";
 import { entries } from "./entries";
+import { images } from "./images";
 import { planner } from "./planner";
 import { startReminders } from "./reminders";
 import { report } from "./report";
@@ -35,6 +37,8 @@ const api = new Hono()
 		await next();
 	})
 	.route("/entries", entries)
+	.route("/drafts", drafts)
+	.route("/images", images)
 	.route("/reviews", reviews)
 	.route("/settings", settings)
 	.route("/planner", planner)

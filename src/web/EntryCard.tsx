@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { formatDate } from "../shared/dates";
 import type { Entry, EntryInput } from "./api";
-import { CodeBlock } from "./CodeBlock";
-import { LANGUAGE_INFO } from "./codeLanguages";
 import { EntryForm } from "./EntryForm";
+import { MarkdownEditor } from "./MarkdownEditor";
 
 type Props = {
 	entry: Entry;
-	onUpdate: (input: EntryInput) => Promise<boolean>;
+	onUpdate: (input: EntryInput) => Promise<string | null>;
 	onDelete: () => void;
+	titles?: readonly string[];
 };
 
-export function EntryCard({ entry, onUpdate, onDelete }: Props) {
+export function EntryCard({ entry, onUpdate, onDelete, titles }: Props) {
 	const [editing, setEditing] = useState(false);
 
 	if (editing) {
@@ -19,11 +19,12 @@ export function EntryCard({ entry, onUpdate, onDelete }: Props) {
 			<EntryForm
 				entry={entry}
 				onSave={async (input) => {
-					const saved = await onUpdate(input);
-					if (saved) setEditing(false);
-					return saved;
+					const problem = await onUpdate(input);
+					if (!problem) setEditing(false);
+					return problem;
 				}}
 				onCancel={() => setEditing(false)}
+				titles={titles}
 			/>
 		);
 	}
@@ -36,13 +37,7 @@ export function EntryCard({ entry, onUpdate, onDelete }: Props) {
 				</time>
 				<h3>{entry.topic}</h3>
 			</header>
-			{entry.notes && <p className="notes">{entry.notes}</p>}
-			{entry.snippets.map((snippet) => (
-				<div key={snippet.id} className="snippet">
-					<span className="label">{LANGUAGE_INFO[snippet.language].label}</span>
-					<CodeBlock language={snippet.language} value={snippet.code} />
-				</div>
-			))}
+			{entry.notes && <MarkdownEditor value={entry.notes} titles={titles} />}
 			<div className="actions">
 				<button onClick={() => setEditing(true)}>Edit</button>
 				<button onClick={onDelete}>Delete</button>

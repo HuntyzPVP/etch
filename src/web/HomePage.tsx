@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { formatDate, today } from "../shared/dates";
 import { api, isOnDuty, useDataChanged, type Entry, type PlannerItem, type Stats } from "./api";
 import { ItemRow, savePlannerItem, useDeleteItem } from "./PlannerPage";
+import { markdownToPlain } from "./MarkdownEditor";
 
 type HomeData = {
 	lastEntry: Entry | undefined;
@@ -108,7 +109,7 @@ export function HomePage() {
 					<>
 						<span className="pill">{formatDate(lastEntry.date, { month: "short", day: "numeric" })}</span>
 						<h3>{lastEntry.topic}</h3>
-						{lastEntry.notes && <p className="notes clamp">{lastEntry.notes}</p>}
+						{lastEntry.notes && <p className="notes clamp">{markdownToPlain(lastEntry.notes)}</p>}
 					</>
 				) : (
 					<p className="empty">Nothing logged yet.</p>

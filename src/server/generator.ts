@@ -3,6 +3,7 @@ import { addDays, daysBetween, inAvailableHours, today } from "../shared/dates";
 import type { Language } from "../shared/languages";
 import { askAgent, log } from "./agent";
 import { db, transaction } from "./db";
+import { splitNotes } from "./fences";
 import { readSettings } from "./settings";
 
 const MAX_ENTRIES = 10;
@@ -40,6 +41,7 @@ const setSetting = db.prepare(
 	"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 );
 // Entries with notes but no questions from them yet, or any entry holding a snippet without exercises.
+// Notes holding only code fences still match the first test, so gatherMaterial drops those.
 const listPending = db.prepare(`
 	SELECT id, topic, notes FROM entries e
 	WHERE (trim(notes) != '' AND NOT EXISTS (SELECT 1 FROM exercises x WHERE x.entry_id = e.id AND x.snippet_id IS NULL))
@@ -48,7 +50,6 @@ const listPending = db.prepare(`
 			WHERE s.entry_id = e.id AND NOT EXISTS (SELECT 1 FROM exercises x WHERE x.snippet_id = s.id)
 		)
 	ORDER BY date, id
-	LIMIT ?
 `);
 const hasNotesExercises = db.prepare("SELECT 1 FROM exercises WHERE entry_id = ? AND snippet_id IS NULL LIMIT 1");
 const hasSnippetExercises = db.prepare("SELECT 1 FROM exercises WHERE snippet_id = ? LIMIT 1");
@@ -72,17 +73,23 @@ export function isScheduledRunDue() {
 }
 
 function gatherMaterial(): Material[] {
-	const entries = listPending.all(MAX_ENTRIES) as { id: number; topic: string; notes: string }[];
-	return entries.map((entry) => ({
-		entry_id: entry.id,
-		topic: entry.topic,
-		notes: entry.notes.trim() && !hasNotesExercises.get(entry.id) ? entry.notes : undefined,
-		snippets: (listNewSnippets.all(entry.id) as { id: number; language: Language; code: string }[]).map((s) => ({
-			snippet_id: s.id,
-			language: s.language,
-			code: s.code,
-		})),
-	}));
+	const entries = listPending.all() as { id: number; topic: string; notes: string }[];
+	return entries
+		.map((entry) => {
+			const { prose } = splitNotes(entry.notes);
+			return {
+				entry_id: entry.id,
+				topic: entry.topic,
+				notes: prose && !hasNotesExercises.get(entry.id) ? prose : undefined,
+				snippets: (listNewSnippets.all(entry.id) as { id: number; language: Language; code: string }[]).map((s) => ({
+					snippet_id: s.id,
+					language: s.language,
+					code: s.code,
+				})),
+			};
+		})
+		.filter((m) => m.notes || m.snippets.length > 0)
+		.slice(0, MAX_ENTRIES);
 }
 
 function save(material: Material[], exercises: GeneratedExercise[], due: string) {

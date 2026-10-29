@@ -1,18 +1,17 @@
-import { useEffect, useState } from "react";
-import { api, useDataChanged, type Entry, type EntryInput } from "./api";
-import { useConfirm } from "./ConfirmDialog";
-import { EntryCard } from "./EntryCard";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { api, entryProblem, fetchEntries, useDataChanged, type Entry, type EntryInput } from "./api";
 import { EntryForm } from "./EntryForm";
+import { NoteRow } from "./NotePage";
 import { ReportButton } from "./ReportDialog";
-
-async function fetchEntries() {
-	const res = await api.entries.$get();
-	return res.json();
-}
 
 export function LogPage() {
 	const [entries, setEntries] = useState<Entry[]>([]);
-	const confirm = useConfirm();
+	const titles = useMemo(() => entries.map((e) => e.topic), [entries]);
+	const [params] = useSearchParams();
+	// Set when a [[link]] to a note that doesn't exist yet was clicked.
+	const linkedTopic = params.get("topic") ?? "";
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		void fetchEntries().then(setEntries);
@@ -26,21 +25,10 @@ export function LogPage() {
 
 	async function create(input: EntryInput) {
 		const res = await api.entries.$post({ json: input });
-		if (res.ok) await reload();
-		return res.ok;
-	}
-
-	async function update(id: number, input: EntryInput) {
-		const res = await api.entries[":id"].$put({ param: { id: String(id) }, json: input });
-		if (res.ok) await reload();
-		return res.ok;
-	}
-
-	async function remove(entry: Entry) {
-		const message = "Its snippets and review exercises are deleted too.";
-		if (!(await confirm({ title: `Delete "${entry.topic}"?`, message, action: "Delete" }))) return;
-		const res = await api.entries[":id"].$delete({ param: { id: String(entry.id) } });
-		if (res.ok) await reload();
+		if (!res.ok) return entryProblem(res.status);
+		if (linkedTopic) navigate(`/notes/${(await res.json()).id}`);
+		else await reload();
+		return null;
 	}
 
 	return (
@@ -49,17 +37,12 @@ export function LogPage() {
 				<h1>Log what I learned</h1>
 				<ReportButton />
 			</div>
-			<EntryForm onSave={create} />
+			<EntryForm key={linkedTopic} onSave={create} titles={titles} initialTopic={linkedTopic} />
 			<section>
-				<h2>Learning log</h2>
+				<h2>Notes</h2>
 				{entries.length === 0 && <p className="empty">Nothing logged yet.</p>}
 				{entries.map((entry) => (
-					<EntryCard
-						key={entry.id}
-						entry={entry}
-						onUpdate={(input) => update(entry.id, input)}
-						onDelete={() => void remove(entry)}
-					/>
+					<NoteRow key={entry.id} entry={entry} />
 				))}
 			</section>
 		</div>

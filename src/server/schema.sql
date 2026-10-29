@@ -82,6 +82,15 @@ CREATE TABLE IF NOT EXISTS reminder_log (
 	PRIMARY KEY (item_id, due)
 );
 
+-- What was typed in a log form but not saved yet. key is 'new' for the new-entry form, or the id of the entry being edited.
+CREATE TABLE IF NOT EXISTS drafts (
+	key TEXT PRIMARY KEY,
+	date TEXT NOT NULL,
+	topic TEXT NOT NULL,
+	notes TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS snippets_entry ON snippets(entry_id);
 CREATE INDEX IF NOT EXISTS exercises_entry ON exercises(entry_id);
 CREATE INDEX IF NOT EXISTS exercises_snippet ON exercises(snippet_id);
