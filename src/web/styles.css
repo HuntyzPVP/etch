@@ -225,3 +225,24 @@ nav a.active {
 	flex-direction: column;
 	gap: 6px;
 }
+
+.setting {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.setting input {
+	width: auto;
+}
+
+.hint {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.actions .hint {
+	align-self: center;
+}

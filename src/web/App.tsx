@@ -1,6 +1,7 @@
 import { BrowserRouter, NavLink, Route, Routes } from "react-router";
 import { LogPage } from "./LogPage";
 import { ReviewsPage } from "./ReviewsPage";
+import { SettingsPage } from "./SettingsPage";
 
 export function App() {
 	return (
@@ -13,11 +14,13 @@ export function App() {
 							Log
 						</NavLink>
 						<NavLink to="/reviews">Reviews</NavLink>
+						<NavLink to="/settings">Settings</NavLink>
 					</nav>
 				</header>
 				<Routes>
 					<Route path="/" element={<LogPage />} />
 					<Route path="/reviews" element={<ReviewsPage />} />
+					<Route path="/settings" element={<SettingsPage />} />
 				</Routes>
 			</main>
 		</BrowserRouter>
