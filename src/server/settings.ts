@@ -12,9 +12,11 @@ type Settings = z.infer<typeof settingsInput>;
 const listSettings = db.prepare("SELECT key, value FROM settings");
 const saveSetting = db.prepare("UPDATE settings SET value = ? WHERE key = ?");
 
-export function readSettings() {
+// Picks only user-facing keys; the generator keeps its own bookkeeping rows in the same table.
+export function readSettings(): Settings {
 	const rows = listSettings.all() as { key: string; value: string }[];
-	return Object.fromEntries(rows.map((r) => [r.key, r.value])) as Settings;
+	const values = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+	return { review_time: values.review_time };
 }
 
 export const settings = new Hono()
