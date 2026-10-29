@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { LANGUAGES } from "../shared/languages";
+import { LANGUAGES, type Language } from "../shared/languages";
 import { db, transaction } from "./db";
 
 type Entry = { id: number; date: string; topic: string; notes: string; created_at: string };
-type Snippet = { id: number; entry_id: number; language: string; code: string; position: number };
+type Snippet = { id: number; entry_id: number; language: Language; code: string; position: number };
 
 const entryInput = z.object({
 	date: z.iso.date(),

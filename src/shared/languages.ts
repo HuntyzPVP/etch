@@ -11,3 +11,5 @@ export const LANGUAGES = [
 	"html",
 	"css",
 ] as const;
+
+export type Language = (typeof LANGUAGES)[number];

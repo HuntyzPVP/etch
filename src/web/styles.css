@@ -1,0 +1,150 @@
+:root {
+	--bg: #f7f6f3;
+	--surface: #ffffff;
+	--text: #1f1f1f;
+	--muted: #6b6b6b;
+	--border: #e2e0db;
+	--accent: #2f6f5e;
+	--accent-text: #ffffff;
+	--error: #b3261e;
+	--code-bg: #f1efea;
+	color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #161616;
+		--surface: #1f1f1f;
+		--text: #e8e6e1;
+		--muted: #9a9892;
+		--border: #333230;
+		--accent: #5fb39c;
+		--accent-text: #0f1f1a;
+		--error: #f2b8b5;
+		--code-bg: #2a2927;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font:
+		16px/1.5 system-ui,
+		sans-serif;
+}
+
+main {
+	max-width: 760px;
+	margin: 0 auto;
+	padding: 24px 16px 64px;
+}
+
+h1 {
+	margin: 0 0 24px;
+	font-size: 1.75rem;
+}
+
+h2 {
+	margin: 32px 0 12px;
+	font-size: 1.1rem;
+	color: var(--muted);
+}
+
+h3 {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+input,
+textarea,
+button {
+	font: inherit;
+	color: inherit;
+}
+
+input,
+textarea {
+	width: 100%;
+	padding: 8px 10px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+textarea {
+	resize: vertical;
+}
+
+button {
+	padding: 6px 14px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-text);
+}
+
+.entry-form,
+.entry {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px;
+	margin-bottom: 12px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+
+.row {
+	display: flex;
+	gap: 10px;
+}
+
+.row input[type="date"] {
+	width: auto;
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.entry time {
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.notes {
+	margin: 0;
+	white-space: pre-wrap;
+}
+
+.snippet {
+	margin: 0;
+	padding: 12px;
+	overflow-x: auto;
+	background: var(--code-bg);
+	border-radius: 6px;
+	font-size: 0.9rem;
+}
+
+.error {
+	margin: 0;
+	color: var(--error);
+}
+
+.empty {
+	color: var(--muted);
+}
