@@ -19,6 +19,7 @@ import {
 	Redo2,
 	SquareCode,
 	Strikethrough,
+	Table,
 	TextQuote,
 	Underline,
 	Undo2,
@@ -34,6 +35,7 @@ import {
 	insertDivider,
 	insertImages,
 	insertLink,
+	insertTable,
 	setHeading,
 	textColor,
 	toggleList,
@@ -51,6 +53,38 @@ const HEADINGS = [
 	{ level: 2, label: "Medium heading", keys: "Ctrl+2" },
 	{ level: 3, label: "Small heading", keys: "Ctrl+3" },
 ];
+const GRID = 6;
+
+// Hovering picks the size; the header row counts as a row.
+function TableSizePicker({ onPick }: { onPick: (rows: number, columns: number) => void }) {
+	const [size, setSize] = useState({ rows: 3, columns: 3 });
+	return (
+		<div className="table-picker">
+			<div className="table-grid" onMouseLeave={() => setSize({ rows: 3, columns: 3 })}>
+				{Array.from({ length: GRID * GRID }, (_, i) => {
+					const row = Math.floor(i / GRID) + 1;
+					const column = (i % GRID) + 1;
+					const lit = row <= size.rows && column <= size.columns;
+					return (
+						<button
+							key={i}
+							type="button"
+							className={lit ? "lit" : ""}
+							aria-label={`${row} by ${column} table`}
+							onMouseDown={keepFocus}
+							onMouseEnter={() => setSize({ rows: row, columns: column })}
+							onClick={() => onPick(row, column)}
+						/>
+					);
+				})}
+			</div>
+			<span className="hint">
+				{size.rows} rows × {size.columns} columns
+			</span>
+		</div>
+	);
+}
+
 const capitalize = (word: string) => word[0].toUpperCase() + word.slice(1);
 
 // Buttons keep the editor's focus and selection instead of taking them.
@@ -325,7 +359,10 @@ export function NoteToolbar({
 					</button>
 				))}
 			</Menu>
-			<Tool label="Divider" onClick={run(insertDivider)}>
+			<Menu label="Table" icon={<Table size={ICON} />} {...menuProps("table")}>
+				<TableSizePicker onPick={(rows, columns) => run(insertTable(rows, columns))()} />
+			</Menu>
+			<Tool label="Divider line" onClick={run(insertDivider)}>
 				<Minus size={ICON} />
 			</Tool>
 			<Tool label="Insert image (or paste one)" onClick={() => fileInput.current?.click()}>

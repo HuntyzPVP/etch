@@ -7,7 +7,7 @@ import {
 	syntaxHighlighting,
 	syntaxTree,
 } from "@codemirror/language";
-import { Facet, Prec, type Range } from "@codemirror/state";
+import { type EditorState, Facet, Prec, type Range, StateField } from "@codemirror/state";
 import {
 	Decoration,
 	type DecorationSet,
@@ -112,6 +112,219 @@ class Checkbox extends WidgetType {
 		return other.checked === this.checked;
 	}
 }
+
+// Bold, `code` and [[links]] inside a table cell, built as DOM so cell text is never treated as HTML.
+function fillCell(cell: HTMLElement, text: string) {
+	for (const part of text.split(/(`[^`]+`|\*\*[^*]+\*\*|\[\[[^[\]\n]+\]\])/)) {
+		if (!part) continue;
+		let node: Node;
+		if (part.startsWith("`")) {
+			node = Object.assign(document.createElement("code"), {
+				className: "md-inline-code",
+				textContent: part.slice(1, -1),
+			});
+		} else if (part.startsWith("**")) {
+			node = Object.assign(document.createElement("strong"), { textContent: part.slice(2, -2) });
+		} else if (part.startsWith("[[")) {
+			const [title, shown] = part.slice(2, -2).split("|");
+			const link = Object.assign(document.createElement("span"), {
+				className: "md-wikilink",
+				textContent: shown ?? title,
+			});
+			link.dataset.title = title.trim();
+			node = link;
+		} else {
+			node = document.createTextNode(part);
+		}
+		cell.append(node);
+	}
+}
+
+const splitRow = (line: string) =>
+	line
+		.trim()
+		.replace(/^\||\|$/g, "")
+		.split(/(?<!\\)\|/)
+		.map((cell) => cell.trim().replace(/\\\|/g, "|"));
+
+const joinRow = (cells: string[]) => `| ${cells.map((c) => c.replace(/\|/g, "\\|").trim() || " ").join(" | ")} |`;
+
+function tableSource(grid: string[][]) {
+	const [head, ...body] = grid;
+	return [joinRow(head), joinRow(head.map(() => "---")), ...body.map(joinRow)].join("\n");
+}
+
+// The source each table's DOM shows. A change made in that DOM doesn't need it rebuilt.
+const shownSource = new WeakMap<HTMLElement, string>();
+
+// Cells are typed into directly; buttons under the table add and remove rows and columns.
+class TableWidget extends WidgetType {
+	constructor(readonly source: string) {
+		super();
+	}
+	eq(other: TableWidget) {
+		return other.source === this.source;
+	}
+	updateDOM(dom: HTMLElement) {
+		return shownSource.get(dom) === this.source;
+	}
+	toDOM(view: EditorView) {
+		const editable = !view.state.readOnly;
+		const [head, , ...body] = this.source.split("\n");
+		const grid = [splitRow(head), ...body.map(splitRow)];
+		const columns = grid[0].length;
+		for (const row of grid) row.splice(columns, Infinity, ...Array<string>(Math.max(0, columns - row.length)).fill(""));
+
+		const wrap = document.createElement("div");
+		wrap.className = "md-table-wrap";
+		const table = wrap.appendChild(document.createElement("table"));
+		table.className = "md-table";
+		shownSource.set(wrap, this.source);
+		let focused = { row: grid.length - 1, col: columns - 1 };
+
+		const commit = () => {
+			const old = shownSource.get(wrap)!;
+			const source = tableSource(grid);
+			if (source === old) return;
+			const from = view.posAtDOM(wrap);
+			shownSource.set(wrap, source);
+			view.dispatch({ changes: { from, to: from + old.length, insert: source } });
+		};
+		const cellAt = (row: number, col: number) =>
+			table.querySelectorAll("tr")[row]?.children[col] as HTMLElement | undefined;
+		const focusCell = (row: number, col: number) => {
+			const cell = cellAt(row, col);
+			if (!cell) return;
+			cell.focus();
+			getSelection()?.selectAllChildren(cell);
+		};
+
+		const render = () => {
+			table.replaceChildren();
+			const thead = table.createTHead();
+			const tbody = table.createTBody();
+			grid.forEach((cells, r) => {
+				const tr = r === 0 ? thead.insertRow() : tbody.insertRow();
+				cells.forEach((text, c) => {
+					const cell = tr.appendChild(document.createElement(r === 0 ? "th" : "td"));
+					fillCell(cell, text);
+					if (!editable) return;
+					cell.contentEditable = "true";
+					// While typing, a cell shows its raw text so ** and ` marks can be edited.
+					cell.addEventListener("focus", () => {
+						focused = { row: r, col: c };
+						cell.textContent = grid[r][c];
+					});
+					cell.addEventListener("input", () => (grid[r][c] = (cell.textContent ?? "").replace(/\n/g, " ")));
+					cell.addEventListener("blur", () => {
+						cell.replaceChildren();
+						fillCell(cell, grid[r][c]);
+						commit();
+					});
+					cell.addEventListener("paste", (event) => {
+						event.preventDefault();
+						document.execCommand("insertText", false, event.clipboardData?.getData("text/plain") ?? "");
+					});
+					cell.addEventListener("keydown", (event) => {
+						if (event.key === "Escape") {
+							cell.blur();
+							view.focus();
+						} else if (event.key === "Enter" && !event.shiftKey) {
+							if (r === grid.length - 1) addRow();
+							focusCell(r + 1, c);
+						} else if (event.key === "Tab") {
+							const next = r * columns + c + (event.shiftKey ? -1 : 1);
+							if (next < 0) return;
+							if (next >= grid.length * columns) addRow();
+							focusCell(Math.floor(next / columns), next % columns);
+						} else return;
+						event.preventDefault();
+					});
+				});
+			});
+		};
+
+		const change = (edit: () => void) => {
+			edit();
+			render();
+			commit();
+		};
+		const addRow = () => change(() => grid.splice(focused.row + 1, 0, Array<string>(grid[0].length).fill("")));
+
+		render();
+		table.addEventListener("mousedown", (event) => {
+			const link = (event.target as HTMLElement).closest<HTMLElement>(".md-wikilink");
+			if (link?.dataset.title && (!editable || event.ctrlKey || event.metaKey)) {
+				event.preventDefault();
+				window.dispatchEvent(new CustomEvent(OPEN_NOTE, { detail: link.dataset.title }));
+			}
+		});
+		if (!editable) return wrap;
+
+		const actions = wrap.appendChild(document.createElement("div"));
+		actions.className = "md-table-actions";
+		const action = (label: string, run: () => void) => {
+			const button = actions.appendChild(document.createElement("button"));
+			button.type = "button";
+			button.textContent = label;
+			// Keeps the cell focused so its row and column are the ones acted on.
+			button.addEventListener("mousedown", (event) => event.preventDefault());
+			button.addEventListener("click", run);
+		};
+		action("+ Row", addRow);
+		action("+ Column", () =>
+			change(() => grid.forEach((row, r) => row.splice(focused.col + 1, 0, r === 0 ? "Column" : ""))),
+		);
+		action("− Row", () => {
+			if (focused.row === 0 || grid.length <= 2) return;
+			change(() => grid.splice(focused.row, 1));
+			focused.row = Math.min(focused.row, grid.length - 1);
+		});
+		action("− Column", () => {
+			if (grid[0].length <= 1) return;
+			change(() => grid.forEach((row) => row.splice(focused.col, 1)));
+			focused.col = Math.min(focused.col, grid[0].length - 1);
+		});
+		action("Delete table", () => {
+			const from = view.posAtDOM(wrap);
+			view.dispatch({ changes: { from, to: from + shownSource.get(wrap)!.length } });
+			view.focus();
+		});
+		return wrap;
+	}
+}
+
+// Tables span lines, which only a state field (not a view plugin) may replace. One shows as its source while the cursor is in it.
+function tableDecorations(state: EditorState): DecorationSet {
+	const cursorLines = new Set<number>();
+	if (!state.readOnly) {
+		for (const range of state.selection.ranges) {
+			for (let n = state.doc.lineAt(range.from).number; n <= state.doc.lineAt(range.to).number; n++) cursorLines.add(n);
+		}
+	}
+	const ranges: Range<Decoration>[] = [];
+	syntaxTree(state).iterate({
+		enter: (node) => {
+			if (node.name !== "Table") return;
+			const first = state.doc.lineAt(node.from);
+			const last = state.doc.lineAt(node.to);
+			for (let n = first.number; n <= last.number; n++) if (cursorLines.has(n)) return false;
+			const widget = new TableWidget(state.sliceDoc(first.from, last.to));
+			ranges.push(Decoration.replace({ widget, block: true }).range(first.from, last.to));
+			return false;
+		},
+	});
+	return Decoration.set(ranges);
+}
+
+const tablePreview = StateField.define<DecorationSet>({
+	create: tableDecorations,
+	update: (decorations, tr) =>
+		tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)
+			? tableDecorations(tr.state)
+			: decorations,
+	provide: (field) => EditorView.decorations.from(field),
+});
 
 const IMAGE = /^!\[([^\]]*)\]\((\S+?)(?:\s+"[^"]*")?\)$/;
 
@@ -394,6 +607,7 @@ export function MarkdownEditor({ value, onChange, placeholder, minHeight, titles
 			linkClicks,
 			markdown({ base: markdownLanguage, codeLanguages: fenceLanguage }),
 			livePreview,
+			tablePreview,
 			EditorView.lineWrapping,
 			imageDrop,
 			formattingKeys,

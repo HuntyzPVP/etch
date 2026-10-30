@@ -123,7 +123,36 @@ export function insertCodeBlock(view: EditorView) {
 	return insertBlock(view, `\`\`\`bash\n${code}\n\`\`\``, 3);
 }
 
-export const insertDivider = (view: EditorView) => insertBlock(view, "---\n", 4);
+// Dividers and tables need blank lines around them, or Markdown reads a divider as a heading underline
+// and a table as part of the text beside it.
+function insertStandalone(view: EditorView, block: string) {
+	const { state } = view;
+	const { from, to } = state.selection.main;
+	const start = state.doc.lineAt(from);
+	const end = state.doc.lineAt(to);
+	const lineAbove = start.number > 1 ? state.doc.line(start.number - 1).text : "";
+	const lineBelow = end.number < state.doc.lines ? state.doc.line(end.number + 1).text : "";
+	const textBefore = state.sliceDoc(start.from, from).trim();
+	const textAfter = state.sliceDoc(to, end.to).trim();
+	const before = textBefore ? "\n\n" : lineAbove.trim() ? "\n" : "";
+	const after = textAfter || lineBelow.trim() ? "\n\n" : "\n";
+	const insert = before + block + after;
+	view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + before.length + block.length + 1 } });
+	return true;
+}
+
+export const insertDivider = (view: EditorView) => insertStandalone(view, "---");
+
+// rows counts the header row.
+export function insertTable(rows: number, columns: number) {
+	return (view: EditorView) => {
+		const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
+		const header = row(Array.from({ length: columns }, (_, i) => `Column ${i + 1}`));
+		const divider = row(Array<string>(columns).fill("---"));
+		const body = Array.from({ length: rows - 1 }, () => row(Array<string>(columns).fill(" ")));
+		return insertStandalone(view, [header, divider, ...body].join("\n"));
+	};
+}
 
 export function insertCallout(kind: (typeof CALLOUTS)[number]) {
 	return (view: EditorView) => {
