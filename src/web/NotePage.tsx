@@ -6,6 +6,7 @@ import { api, entryProblem, fetchEntries, useDataChanged, type Entry, type Entry
 import { useConfirm } from "./ConfirmDialog";
 import { EntryCard } from "./EntryCard";
 import { markdownToPlain } from "./MarkdownEditor";
+import { NoteColumn } from "./NoteColumn";
 
 export function NoteRow({ entry }: { entry: Entry }) {
 	const preview = markdownToPlain(entry.notes);
@@ -60,7 +61,7 @@ export function NotePage() {
 	}
 
 	return (
-		<div className="narrow">
+		<NoteColumn>
 			<EntryCard key={entry.id} entry={entry} titles={titles} onUpdate={update} onDelete={() => void remove()} />
 			<section>
 				<h2>Linked from</h2>
@@ -69,6 +70,6 @@ export function NotePage() {
 					<NoteRow key={e.id} entry={e} />
 				))}
 			</section>
-		</div>
+		</NoteColumn>
 	);
 }

@@ -157,6 +157,26 @@ function tableSource(grid: string[][]) {
 // The source each table's DOM shows. A change made in that DOM doesn't need it rebuilt.
 const shownSource = new WeakMap<HTMLElement, string>();
 
+const tableObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+function loadWidths(key: string, columns: number) {
+	try {
+		const widths = JSON.parse(localStorage.getItem(key) ?? "null") as number[] | null;
+		return Array.isArray(widths) && widths.length === columns ? widths : null;
+	} catch {
+		return null;
+	}
+}
+
+function storeWidths(key: string, widths: number[] | null) {
+	try {
+		if (widths) localStorage.setItem(key, JSON.stringify(widths));
+		else localStorage.removeItem(key);
+	} catch {
+		// Storage blocked: the widths just aren't remembered.
+	}
+}
+
 // Cells are typed into directly; buttons under the table add and remove rows and columns.
 class TableWidget extends WidgetType {
 	constructor(readonly source: string) {
@@ -167,6 +187,9 @@ class TableWidget extends WidgetType {
 	}
 	updateDOM(dom: HTMLElement) {
 		return shownSource.get(dom) === this.source;
+	}
+	destroy(dom: HTMLElement) {
+		tableObservers.get(dom)?.disconnect();
 	}
 	toDOM(view: EditorView) {
 		const editable = !view.state.readOnly;
@@ -181,6 +204,64 @@ class TableWidget extends WidgetType {
 		table.className = "md-table";
 		shownSource.set(wrap, this.source);
 		let focused = { row: grid.length - 1, col: columns - 1 };
+
+		// Column widths dragged by hand, remembered per table by its header row.
+		const widthsKey = `etch-table-widths:${grid[0].join("|")}`;
+		let widths = loadWidths(widthsKey, columns);
+		const grips = wrap.appendChild(document.createElement("div"));
+		grips.className = "md-col-grips";
+		const applyWidths = () => {
+			const fixed = widths !== null && widths.length === grid[0].length;
+			table.style.tableLayout = fixed ? "fixed" : "";
+			table.style.width = fixed ? `${widths!.reduce((sum, w) => sum + w, 0)}px` : "";
+			table.querySelectorAll("col").forEach((col, i) => (col.style.width = fixed ? `${widths![i]}px` : ""));
+		};
+		const startResize = (event: PointerEvent, i: number, grip: HTMLElement) => {
+			event.preventDefault();
+			if (!widths || widths.length !== grid[0].length) {
+				widths = [...table.querySelectorAll("th")].map((th) => th.offsetWidth);
+			}
+			const startX = event.clientX;
+			const startWidth = widths[i];
+			grip.setPointerCapture(event.pointerId);
+			grip.classList.add("dragging");
+			const move = (e: PointerEvent) => {
+				widths![i] = Math.max(40, Math.round(startWidth + e.clientX - startX));
+				applyWidths();
+			};
+			grip.addEventListener("pointermove", move);
+			grip.addEventListener(
+				"pointerup",
+				() => {
+					grip.removeEventListener("pointermove", move);
+					grip.classList.remove("dragging");
+					storeWidths(widthsKey, widths);
+				},
+				{ once: true },
+			);
+		};
+		const placeGrips = () => {
+			const heads = [...table.querySelectorAll("th")];
+			grips.replaceChildren(
+				...heads.slice(0, -1).map((th, i) => {
+					const grip = document.createElement("div");
+					grip.className = "md-col-grip";
+					grip.title = "Drag to resize, double-click to reset";
+					grip.style.left = `${table.offsetLeft + th.offsetLeft + th.offsetWidth}px`;
+					grip.style.height = `${th.offsetHeight}px`;
+					grip.addEventListener("pointerdown", (event) => startResize(event, i, grip));
+					grip.addEventListener("dblclick", () => {
+						widths = null;
+						storeWidths(widthsKey, null);
+						applyWidths();
+					});
+					return grip;
+				}),
+			);
+		};
+		const observer = new ResizeObserver(placeGrips);
+		observer.observe(table);
+		tableObservers.set(wrap, observer);
 
 		const commit = () => {
 			const old = shownSource.get(wrap)!;
@@ -201,6 +282,8 @@ class TableWidget extends WidgetType {
 
 		const render = () => {
 			table.replaceChildren();
+			const colgroup = table.appendChild(document.createElement("colgroup"));
+			for (let c = 0; c < grid[0].length; c++) colgroup.appendChild(document.createElement("col"));
 			const thead = table.createTHead();
 			const tbody = table.createTBody();
 			grid.forEach((cells, r) => {
@@ -233,15 +316,17 @@ class TableWidget extends WidgetType {
 							if (r === grid.length - 1) addRow();
 							focusCell(r + 1, c);
 						} else if (event.key === "Tab") {
-							const next = r * columns + c + (event.shiftKey ? -1 : 1);
+							const width = grid[0].length;
+							const next = r * width + c + (event.shiftKey ? -1 : 1);
 							if (next < 0) return;
-							if (next >= grid.length * columns) addRow();
-							focusCell(Math.floor(next / columns), next % columns);
+							if (next >= grid.length * width) addRow();
+							focusCell(Math.floor(next / width), next % width);
 						} else return;
 						event.preventDefault();
 					});
 				});
 			});
+			applyWidths();
 		};
 
 		const change = (edit: () => void) => {

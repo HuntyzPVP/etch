@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { api, entryProblem, fetchEntries, useDataChanged, type Entry, type EntryInput } from "./api";
 import { EntryForm } from "./EntryForm";
+import { NoteColumn } from "./NoteColumn";
 import { NoteRow } from "./NotePage";
 import { ReportButton } from "./ReportDialog";
 
@@ -32,7 +33,7 @@ export function LogPage() {
 	}
 
 	return (
-		<div className="narrow">
+		<NoteColumn>
 			<div className="page-heading">
 				<h1>Log what I learned</h1>
 				<ReportButton />
@@ -45,6 +46,6 @@ export function LogPage() {
 					<NoteRow key={entry.id} entry={entry} />
 				))}
 			</section>
-		</div>
+		</NoteColumn>
 	);
 }

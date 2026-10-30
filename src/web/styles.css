@@ -904,6 +904,9 @@ a.button.log-button {
 
 .md-table th,
 .md-table td {
+	/* The editor breaks long words anywhere; in a table that splits words like "Network" mid-word. */
+	overflow-wrap: break-word;
+	word-break: normal;
 	padding: 6px 10px;
 	text-align: left;
 	vertical-align: top;
@@ -916,7 +919,47 @@ a.button.log-button {
 }
 
 .md-table-wrap {
+	position: relative;
 	margin: 6px 0;
+	overflow-x: auto;
+}
+
+.md-col-grip {
+	position: absolute;
+	top: 0;
+	width: 7px;
+	margin-left: -4px;
+	cursor: col-resize;
+	border-radius: 3px;
+}
+
+.md-col-grip:hover,
+.md-col-grip.dragging {
+	background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.note-column {
+	position: relative;
+	width: min(var(--note-width), calc(100vw - 32px));
+	max-width: none;
+	/* Wider than the page, the column grows out to both sides instead of only to the right. */
+	margin-left: min(0px, calc((100% - min(var(--note-width), 100vw - 32px)) / 2));
+}
+
+.width-handle {
+	position: absolute;
+	top: 0;
+	right: -14px;
+	bottom: 0;
+	width: 8px;
+	cursor: col-resize;
+	border-radius: 4px;
+	transition: background-color 150ms var(--ease);
+}
+
+.width-handle:hover,
+.width-handle:active {
+	background: var(--line);
 }
 
 .md-table-wrap .md-table {
