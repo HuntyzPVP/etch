@@ -7,7 +7,7 @@ import { db, transaction } from "./db";
 const settingsInput = z
 	.object({
 		frequency: z.enum(["daily", "every2", "weekly", "manual"]),
-		daily_cap: z.enum(["10", "20", "30", "none"]),
+		daily_cap: z.enum(["3", "5", "10", "20", "30", "none"]),
 		status: z.enum(["active", "busy", "away"]),
 		available_days: z.array(z.number().int().min(0).max(6)).min(1),
 		available_start: z.string().regex(TIME_PATTERN),

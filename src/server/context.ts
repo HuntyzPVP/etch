@@ -32,10 +32,10 @@ const resultsByTopic = db.prepare(`
 	ORDER BY entries.date DESC
 `);
 const listOpenItems = db.prepare(
-	"SELECT title, due_date, due_time FROM planner_items WHERE done = 0 ORDER BY due_date IS NULL, due_date, due_time",
+	"SELECT id, title, due_date, due_time FROM planner_items WHERE done = 0 ORDER BY due_date IS NULL, due_date, due_time",
 );
 const listDoneItems = db.prepare(
-	"SELECT title, date(done_at, 'localtime') AS done_on FROM planner_items WHERE done = 1 AND date(done_at, 'localtime') >= ? ORDER BY done_at DESC",
+	"SELECT id, title, date(done_at, 'localtime') AS done_on FROM planner_items WHERE done = 1 AND date(done_at, 'localtime') >= ? ORDER BY done_at DESC",
 );
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…` : text);
@@ -71,9 +71,33 @@ export const reviewResults = (since: string) =>
 	resultsByTopic.all(since) as { topic: string; reviews: number; got: number }[];
 
 export const plannerSnapshot = (doneSince: string) => ({
-	open: listOpenItems.all() as { title: string; due_date: string | null; due_time: string | null }[],
-	done: listDoneItems.all(doneSince) as { title: string; done_on: string }[],
+	open: listOpenItems.all() as { id: number; title: string; due_date: string | null; due_time: string | null }[],
+	done: listDoneItems.all(doneSince) as { id: number; title: string; done_on: string }[],
 });
+
+const reviewsByNote = db.prepare(`
+	SELECT entries.id AS note_id, entries.topic AS title,
+		SUM(exercises.due_date <= ?) AS due_now,
+		SUM(exercises.due_date > ?) AS later,
+		MIN(CASE WHEN exercises.due_date > ? THEN exercises.due_date END) AS next_due
+	FROM exercises
+	JOIN entries ON entries.id = exercises.entry_id
+	WHERE exercises.cleared = 0 AND exercises.retired = 0
+	GROUP BY entries.id
+	ORDER BY entries.topic
+`);
+
+// Review exercises still in rotation, counted per note: due now, due later, and the next date one comes up.
+export function reviewsSnapshot() {
+	const day = today();
+	return reviewsByNote.all(day, day, day) as {
+		note_id: number;
+		title: string;
+		due_now: number;
+		later: number;
+		next_due: string | null;
+	}[];
+}
 
 // Markdown notes about career goals, from the folder CAREER_NOTES_DIR points at. Missing folder means none.
 export function careerNotes() {

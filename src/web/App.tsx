@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
 import { titleKey } from "../shared/links";
-import { api, fetchEntries, isOnDuty, OPEN_NOTE, SETTINGS_CHANGED, type AppSettings } from "./api";
+import { api, DATA_CHANGED, fetchEntries, isOnDuty, OPEN_NOTE, SETTINGS_CHANGED, type AppSettings } from "./api";
 import { Assistant } from "./Assistant";
 import { ConfirmProvider } from "./ConfirmDialog";
 import { GraphPage } from "./GraphPage";
@@ -37,10 +37,14 @@ function Shell() {
 	const [settings, setSettings] = useState<AppSettings | null>(null);
 
 	useEffect(() => {
-		void api.reviews.due
-			.$get()
-			.then((res) => res.json())
-			.then((due) => setDueCount(due.length));
+		const loadDue = () =>
+			void api.reviews.due
+				.$get()
+				.then((res) => res.json())
+				.then((due) => setDueCount(due.length));
+		loadDue();
+		// The assistant can delete, move or spread reviews, which changes the badge without changing pages.
+		window.addEventListener(DATA_CHANGED, loadDue);
 		const loadSettings = () =>
 			void api.settings
 				.$get()
@@ -48,7 +52,12 @@ function Shell() {
 				.then(setSettings);
 		loadSettings();
 		window.addEventListener(SETTINGS_CHANGED, loadSettings);
-		return () => window.removeEventListener(SETTINGS_CHANGED, loadSettings);
+		window.addEventListener(SETTINGS_CHANGED, loadDue);
+		return () => {
+			window.removeEventListener(DATA_CHANGED, loadDue);
+			window.removeEventListener(SETTINGS_CHANGED, loadSettings);
+			window.removeEventListener(SETTINGS_CHANGED, loadDue);
+		};
 	}, [pathname]);
 
 	const navigate = useNavigate();

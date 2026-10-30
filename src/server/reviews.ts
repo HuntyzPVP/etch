@@ -23,7 +23,7 @@ const listDue = db.prepare(`
 	SELECT exercises.id, exercises.prompt, exercises.answer, exercises.language, exercises.streak, entries.topic
 	FROM exercises
 	JOIN entries ON entries.id = exercises.entry_id
-	WHERE exercises.retired = 0 AND exercises.due_date <= ?
+	WHERE exercises.retired = 0 AND exercises.cleared = 0 AND exercises.due_date <= ?
 	ORDER BY exercises.due_date, exercises.id
 	LIMIT ?
 `);
@@ -33,12 +33,21 @@ const listAll = db.prepare(`
 	SELECT exercises.id, exercises.prompt, exercises.answer, exercises.language, exercises.streak, entries.topic
 	FROM exercises
 	JOIN entries ON entries.id = exercises.entry_id
+	WHERE exercises.cleared = 0
 	ORDER BY exercises.id
 `);
 const getState = db.prepare("SELECT interval_days, streak FROM exercises WHERE id = ?");
 const saveOutcome = db.prepare(
 	"UPDATE exercises SET interval_days = ?, streak = ?, retired = ?, due_date = ? WHERE id = ?",
 );
+// note_id null means every note's reviews.
+const scopeInput = z.object({ note_id: z.number().int().positive().nullable().default(null) });
+const ACTIVE = "cleared = 0 AND retired = 0 AND (? IS NULL OR entry_id = ?)";
+const clearReviews = db.prepare(`UPDATE exercises SET cleared = 1 WHERE cleared = 0 AND (? IS NULL OR entry_id = ?)`);
+const postponeReviews = db.prepare(`UPDATE exercises SET due_date = ? WHERE ${ACTIVE} AND due_date < ?`);
+const listDueIds = db.prepare(`SELECT id FROM exercises WHERE ${ACTIVE} AND due_date <= ? ORDER BY due_date, id`);
+const setDueDate = db.prepare("UPDATE exercises SET due_date = ? WHERE id = ?");
+
 const logReview = db.prepare("INSERT INTO review_log (exercise_id, got, reviewed_on) VALUES (?, ?, ?)");
 
 export const reviews = new Hono()
@@ -58,6 +67,24 @@ export const reviews = new Hono()
 		}
 	})
 	.get("/practice", (c) => c.json(listAll.all() as DueExercise[]))
+	.post("/clear", zValidator("json", scopeInput), (c) => {
+		const { note_id } = c.req.valid("json");
+		return c.json({ changed: Number(clearReviews.run(note_id, note_id).changes) });
+	})
+	// Everything due before the date moves to it, so nothing comes up until then.
+	.post("/postpone", zValidator("json", scopeInput.extend({ date: z.iso.date() })), (c) => {
+		const { note_id, date } = c.req.valid("json");
+		return c.json({ changed: Number(postponeReviews.run(date, note_id, note_id, date).changes) });
+	})
+	// What's due now is shared out evenly over the days, starting today.
+	.post("/spread", zValidator("json", scopeInput.extend({ days: z.number().int().min(1).max(365) })), (c) => {
+		const { note_id, days } = c.req.valid("json");
+		const ids = (listDueIds.all(note_id, note_id, today()) as { id: number }[]).map((row) => row.id);
+		transaction(() =>
+			ids.forEach((id, i) => setDueDate.run(addDays(today(), Math.floor((i * days) / ids.length)), id)),
+		);
+		return c.json({ changed: ids.length });
+	})
 	.post("/:id/result", zValidator("param", idParam), zValidator("json", z.object({ got: z.boolean() })), (c) => {
 		const { id } = c.req.valid("param");
 		const state = getState.get(id) as ReviewState | undefined;

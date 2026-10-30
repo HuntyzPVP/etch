@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { RETIRE_AFTER, type ReviewOutcome } from "../shared/spacing";
-import { api, type DueExercise, type PracticeExercise } from "./api";
+import { api, type DueExercise, type PracticeExercise, useDataChanged } from "./api";
 import { CodeBlock } from "./CodeBlock";
 import { Flashcards, Match, MultipleChoice } from "./PracticeModes";
 
@@ -85,6 +85,14 @@ function WriteReviews() {
 			.then((res) => res.json())
 			.then(setQueue);
 	}, []);
+
+	useDataChanged(
+		() =>
+			void api.reviews.due
+				.$get()
+				.then((res) => res.json())
+				.then(setQueue),
+	);
 
 	async function generate() {
 		setGenerating(true);

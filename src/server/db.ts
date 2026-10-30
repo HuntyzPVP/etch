@@ -13,6 +13,12 @@ db.exec("PRAGMA foreign_keys = ON");
 db.exec("PRAGMA journal_mode = WAL");
 db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
 
+// Databases made before reviews could be deleted.
+const exerciseColumns = db.prepare("PRAGMA table_info(exercises)").all() as { name: string }[];
+if (!exerciseColumns.some((c) => c.name === "cleared")) {
+	db.exec("ALTER TABLE exercises ADD COLUMN cleared INTEGER NOT NULL DEFAULT 0");
+}
+
 export function transaction<T>(fn: () => T): T {
 	db.exec("BEGIN");
 	try {

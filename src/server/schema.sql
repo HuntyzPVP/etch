@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS exercises (
 	interval_days INTEGER NOT NULL DEFAULT 0,
 	streak INTEGER NOT NULL DEFAULT 0,
 	retired INTEGER NOT NULL DEFAULT 0,
+	-- Deleted by the user. The row stays hidden so the generator doesn't write the same exercise again.
+	cleared INTEGER NOT NULL DEFAULT 0,
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
