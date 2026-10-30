@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDate, formatTime } from "../shared/dates";
-import { api, DATA_CHANGED, type ChatAction } from "./api";
+import { api, DATA_CHANGED, type ChatAction, type Entry } from "./api";
+import { markdownToPlain } from "./MarkdownEditor";
 
 // Within the server's limits.
 const MESSAGE_LIMIT = 8000;
@@ -59,14 +60,9 @@ export function Assistant() {
 	async function confirm(messageIndex: number, actionIndex: number, action: ChatAction) {
 		setActionState(messageIndex, actionIndex, "saving");
 		try {
-			const res =
-				action.kind === "add_planner_item"
-					? await api.planner.$post({
-							json: { title: action.title, due_date: action.due_date, due_time: action.due_time },
-						})
-					: await api.entries.$post({ json: { date: action.date, topic: action.topic, notes: action.notes } });
-			setActionState(messageIndex, actionIndex, res.ok ? "added" : "failed");
-			if (res.ok) window.dispatchEvent(new Event(DATA_CHANGED));
+			const ok = await apply(action);
+			setActionState(messageIndex, actionIndex, ok ? "added" : "failed");
+			if (ok) window.dispatchEvent(new Event(DATA_CHANGED));
 		} catch {
 			setActionState(messageIndex, actionIndex, "failed");
 		}
@@ -165,38 +161,86 @@ export function Assistant() {
 	);
 }
 
+async function apply(action: ChatAction) {
+	if (action.kind === "add_planner_item") {
+		const json = { title: action.title, due_date: action.due_date, due_time: action.due_time };
+		return (await api.planner.$post({ json })).ok;
+	}
+	if (action.kind === "add_log_entry") {
+		return (await api.entries.$post({ json: { date: action.date, topic: action.topic, notes: action.notes } })).ok;
+	}
+	const param = { id: String(action.id) };
+	if (action.kind === "delete_note") return (await api.entries[":id"].$delete({ param })).ok;
+	// Edits start from the note as it is now, not as the assistant saw it.
+	const res = await api.entries[":id"].$get({ param });
+	if (!res.ok) return false;
+	const entry = (await res.json()) as Entry;
+	const topic = action.kind === "rename_note" ? action.topic : entry.topic;
+	const notes =
+		action.kind === "append_to_note"
+			? `${entry.notes.trimEnd()}\n\n${action.notes}`
+			: action.kind === "rewrite_note"
+				? action.notes
+				: entry.notes;
+	return (await api.entries[":id"].$put({ param, json: { date: entry.date, topic, notes } })).ok;
+}
+
 const STATE_LABELS: Partial<Record<ActionState, string>> = {
-	added: "Added",
+	added: "Done",
 	skipped: "Skipped",
-	failed: "Couldn't add this",
+	failed: "Couldn't do this",
+};
+
+const ACTION_LABELS: Record<ChatAction["kind"], { label: string; button: string }> = {
+	add_planner_item: { label: "Add to planner", button: "Add" },
+	add_log_entry: { label: "New note", button: "Add" },
+	append_to_note: { label: "Add to note", button: "Add" },
+	rename_note: { label: "Rename note", button: "Rename" },
+	rewrite_note: { label: "Rewrite note", button: "Save" },
+	delete_note: { label: "Delete note", button: "Delete" },
 };
 
 type ActionCardProps = { action: ChatAction; state: ActionState; onConfirm: () => void; onSkip: () => void };
 
 function ActionCard({ action, state, onConfirm, onSkip }: ActionCardProps) {
-	const isItem = action.kind === "add_planner_item";
-	const when = isItem
-		? [
+	const { label, button } = ACTION_LABELS[action.kind];
+	let title: string;
+	let when: string | null = null;
+	let body: string | null = null;
+	if (action.kind === "add_planner_item") {
+		title = action.title;
+		when =
+			[
 				action.due_date && formatDate(action.due_date, { weekday: "short", month: "short", day: "numeric" }),
 				action.due_time && formatTime(action.due_time),
 			]
 				.filter(Boolean)
-				.join(", ") || "Someday"
-		: formatDate(action.date, { month: "short", day: "numeric" });
+				.join(", ") || "Someday";
+	} else if (action.kind === "rename_note") {
+		title = `${action.from} → ${action.topic}`;
+	} else {
+		title = action.topic;
+		if (action.kind === "add_log_entry") when = formatDate(action.date, { month: "short", day: "numeric" });
+		if (action.kind !== "delete_note") body = markdownToPlain(action.notes);
+	}
 
 	return (
 		<div className={`action-card ${state}`}>
-			<span className="label">{isItem ? "Add to planner" : "Add to log"}</span>
-			<span className="action-title">{isItem ? action.title : action.topic}</span>
-			<span className="pill">{when}</span>
-			{!isItem && action.notes && <p className="notes clamp">{action.notes}</p>}
+			<span className="label">{label}</span>
+			<span className="action-title">{title}</span>
+			{when && <span className="pill">{when}</span>}
+			{body && <p className="notes clamp">{body}</p>}
 			{state === "pending" || state === "saving" ? (
 				<div className="actions">
 					<button disabled={state === "saving"} onClick={onSkip}>
 						Skip
 					</button>
-					<button className="primary" disabled={state === "saving"} onClick={onConfirm}>
-						Add
+					<button
+						className={action.kind === "delete_note" ? "danger" : "primary"}
+						disabled={state === "saving"}
+						onClick={onConfirm}
+					>
+						{button}
 					</button>
 				</div>
 			) : (

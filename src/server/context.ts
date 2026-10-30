@@ -8,6 +8,7 @@ const LOOKBACK_DAYS = 30;
 const NOTES_LIMIT = 1200;
 const CODE_LIMIT = 800;
 const CAREER_LIMIT = 30_000;
+const ALL_NOTES_LIMIT = 80_000;
 
 // Machine-specific paths such as CAREER_NOTES_DIR live in .env, which stays out of git.
 try {
@@ -20,6 +21,7 @@ const listRecent = db.prepare(
 	"SELECT id, date, topic, notes FROM entries WHERE date >= ? ORDER BY date DESC, id DESC LIMIT ?",
 );
 const listSnippets = db.prepare("SELECT language, code FROM snippets WHERE entry_id = ? ORDER BY position");
+const listAllNotes = db.prepare("SELECT id, date, topic AS title, notes FROM entries ORDER BY date DESC, id DESC");
 const resultsByTopic = db.prepare(`
 	SELECT entries.topic, COUNT(*) AS reviews, SUM(review_log.got) AS got
 	FROM review_log
@@ -51,6 +53,18 @@ export function recentLog(since: string, limit: number, { withCode }: { withCode
 				: snippets.map((s) => s.language),
 		};
 	});
+}
+
+// Every note in full, newest first, so the assistant can read and edit them. Ones that don't fit are left out.
+export function allNotes() {
+	let room = ALL_NOTES_LIMIT;
+	const notes: { id: number; date: string; title: string; notes: string }[] = [];
+	for (const note of listAllNotes.all() as typeof notes) {
+		if (note.notes.length > room) continue;
+		room -= note.notes.length;
+		notes.push(note);
+	}
+	return notes;
 }
 
 export const reviewResults = (since: string) =>
