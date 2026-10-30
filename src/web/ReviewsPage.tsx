@@ -20,13 +20,14 @@ export function ReviewsPage() {
 	const [mode, setMode] = useState<Mode>("write");
 	const [pool, setPool] = useState<PracticeExercise[] | null>(null);
 
+	// Fetched on every switch, so exercises made while the page was open show up.
 	useEffect(() => {
-		if (mode === "write" || pool !== null) return;
+		if (mode === "write") return;
 		void api.reviews.practice
 			.$get()
 			.then((res) => res.json())
 			.then(setPool);
-	}, [mode, pool]);
+	}, [mode]);
 
 	return (
 		<div className="narrow">
